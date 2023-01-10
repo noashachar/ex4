@@ -6,7 +6,7 @@
 #include "knn.h"
 using namespace std;
 
-//init func of knn, inherited from DistanceVector withe the input vector
+//init func of knn, inherited from DistanceVector with the input vector
 Knn::Knn(int k, vector<vector<double>> &X,vector<string> &y, DistanceCalculator *distance, vector<double> input_vec){
     knnK = k;
     knnX = X;
