@@ -55,7 +55,7 @@ bool Server::listenForClients(int MAX_CLIENTS = 5) {
 /*
     Send data to the connected host
 */
-bool Server::sendData(string data) {
+bool Server::sendData(string &data) {
     // Send some data
     if (send(client_sock_fd, data.c_str(), data.length(), 0) < 0) {
         perror("Send failed :( ");
