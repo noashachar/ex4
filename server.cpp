@@ -12,32 +12,30 @@
 #include "knn.h"
 
 using namespace std;
-//"127.0.0.1"
-/*
-    constructor
-*/
+
+
 Server::Server(const int p) {
-    sock = -1;
+    server_sock_fd = -1;
     port_no = p;
 }
 
 /*
     Connect to a host on a certain port number
 */
-bool Server::conn() {
+bool Server::openServerSocketAndBindPort() {
     // create socket if it is not already created
-    if (sock == -1) {
+    if (server_sock_fd == -1) {
         //Create socket
-        sock = socket(AF_INET, SOCK_STREAM, 0);
-        if (sock < 0) {
+        server_sock_fd = socket(AF_INET, SOCK_STREAM, 0);
+        if (server_sock_fd < 0) {
             perror("error creating socket");
             return false;
         }
-        memset(&client_sin, 0, sizeof(client_sin));
-        client_sin.sin_family = AF_INET;
-        client_sin.sin_addr.s_addr = INADDR_ANY;
-        client_sin.sin_port = htons(port_no);
-        if (bind(sock, (struct sockaddr *) &client_sin, sizeof(client_sin)) < 0) {
+        memset(&server_sockaddr, 0, sizeof(server_sockaddr));
+        server_sockaddr.sin_family = AF_INET;
+        server_sockaddr.sin_addr.s_addr = INADDR_ANY;
+        server_sockaddr.sin_port = htons(port_no);
+        if (bind(server_sock_fd, (struct sockaddr *) &server_sockaddr, sizeof(server_sockaddr)) < 0) {
             perror("error binding socket");
             return false;
         }
@@ -45,8 +43,8 @@ bool Server::conn() {
     return true;
 }
 
-bool Server::listenToClient(int n = 5) {
-    if (listen(sock, n) < 0) {
+bool Server::listenForClients(int MAX_CLIENTS = 5) {
+    if (listen(server_sock_fd, MAX_CLIENTS) < 0) {
         perror("error listening to a socket");
         return false;
     }
@@ -59,7 +57,7 @@ bool Server::listenToClient(int n = 5) {
 */
 bool Server::sendData(string data) {
     // Send some data
-    if (send(client_sock, data.c_str(), data.length(), 0) < 0) {
+    if (send(client_sock_fd, data.c_str(), data.length(), 0) < 0) {
         perror("Send failed :( ");
         return false;
     }
@@ -68,9 +66,9 @@ bool Server::sendData(string data) {
 }
 
 bool Server::acceptClient() {
-    unsigned int addr_len = sizeof(client_sin);
-    client_sock = accept(sock, (struct sockaddr *) &client_sin, &addr_len);
-    if (client_sock < 0) {
+    unsigned int addr_len = sizeof(server_sockaddr);
+    client_sock_fd = accept(server_sock_fd, (struct sockaddr *) &server_sockaddr, &addr_len);
+    if (client_sock_fd < 0) {
         perror("error accepting client");
         return false;
     }
@@ -83,7 +81,7 @@ bool Server::acceptClient() {
 string Server::receive(int size = 4096) {
     char buffer[size];
     string reply;
-    int read_bytes = recv(client_sock, buffer, sizeof(buffer), 0);
+    int read_bytes = recv(client_sock_fd, buffer, sizeof(buffer), 0);
     reply = buffer;
     memset(buffer, 0, sizeof(buffer));
 
@@ -96,8 +94,8 @@ string Server::receive(int size = 4096) {
 }
 
 
-void Server::closeConn() {
-    int result = close(client_sock);
+void Server::closeClientSock() {
+    int result = close(client_sock_fd);
     if (result < 0) {
         perror("could not close socket with client");
     }
@@ -162,11 +160,11 @@ int main(int argc, char *argv[]) {
         return -2;
     }
     Server s(server_port);
-    if (!s.conn()) {
+    if (!s.openServerSocketAndBindPort()) {
         perror("server could not connect");
         return 1;
     }
-    if (!s.listenToClient()) {
+    if (!s.listenForClients()) {
         perror("could not listen for clients");
         return 2;
     }
@@ -214,7 +212,7 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        s.closeConn();
+        s.closeClientSock();
     }
 
     return 0;
