@@ -7,10 +7,10 @@ client.o: TcpClient.cpp
 	 g++ -std=c++11 -c TcpClient.cpp
 
 server: server.o distances.o utils.o knn.o
-	 g++ -std=c++11 server.o distances.o utils.o knn.o -o server.out
+	 g++ -std=c++11 server.o distances.o utils.o knn.o -lpthread -o server.out
 
 server.o: server.cpp server.h
-	 g++ -std=c++11 -c server.cpp
+	 g++ -std=c++11 -c server.cpp -lpthread
 
 distances.o: distances.cpp distances.h
 	 g++ -std=c++11 -c distances.cpp
