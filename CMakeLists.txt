@@ -12,8 +12,8 @@ set(Sources
         TcpClient.cpp
         distances.cpp
         knn.cpp
-        server.cpp
         utils.cpp
+        server.cpp
 )
 
 set(Headers
@@ -24,8 +24,8 @@ set(Headers
         TcpClient.h
         distances.h
         knn.h
-        server.h
         utils.h
+        server.h
 )
 
 add_executable(ex4 ${Sources} ${Headers})
