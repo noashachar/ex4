@@ -17,6 +17,10 @@ public:
     std::string getDescription();
     Command(DefaultIO* dio, std::string description);
     virtual void execute() = 0;
+
+    // this doesn't delete dio, because many commands share the same dio;
+    // also the commands' parent share the same dio. hence the parent will delete it.
+    virtual ~Command() {}
 };
 
 

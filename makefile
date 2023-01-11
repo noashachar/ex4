@@ -1,4 +1,4 @@
-all: server client
+all: server client main
 
 client: TcpClient.cpp TcpClient.h
 	 g++ -std=c++11 TcpClient.cpp -o client.out
@@ -23,3 +23,30 @@ knn.o: knn.cpp knn.h
 
 clean:
 	 rm -f *.o
+
+
+
+
+Command.o: Command.cpp Command.h
+	 g++ -std=c++11 -c command.cpp
+
+CmdAlgoSettings.o: CmdAlgoSettings.h CmdAlgoSettings.cpp
+	 g++ -std=c++11 -c CmdAlgoSettings.cpp
+
+CmdClassify.o: CmdClassify.cpp CmdClassify.h
+	 g++ -std=c++11 -c CmdClassify.cpp
+
+CmdDownloadResults.o: CmdDownloadResults.cpp CmdDownloadResults.h
+	 g++ -std=c++11 -c CmdDownloadResults.cpp
+
+CmdDisplayResults.o: CmdDisplayResults.cpp CmdDisplayResults.h
+	 g++ -std=c++11 -c CmdDisplayResults.cpp
+
+CmdUploadCsv.o: CmdUploadCsv.cpp CmdUploadCsv.h
+	 g++ -std=c++11 -c CmdUploadCsv.cpp
+
+main.o: main.cpp
+	 g++ -std=c++11 -c main.cpp
+
+main: main.o Command.o CmdAlgoSettings.o CmdClassify.o CmdDownloadResults.o CmdDisplayResults.o CmdUploadCsv.o
+	 g++ -std=c++11 main.o Command.o CmdAlgoSettings.o CmdClassify.o CmdDownloadResults.o CmdDisplayResults.o CmdUploadCsv.o -o main.out
