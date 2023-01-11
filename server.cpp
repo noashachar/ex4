@@ -7,12 +7,11 @@
 #include <string.h>
 #include "server.h"
 #include <vector>
-#include "utils.h"
-#include "distances.h"
-#include "knn.h"
 #include <thread>
 #include <algorithm>
 
+#include "SocketIO.h"
+#include "cli.cpp"
 
 using namespace std;
 
@@ -111,29 +110,12 @@ void Server::closeServerSock() {
     }
 }
 
-struct ClientHandlingArgs {
-    Server* s;
-    int client_sock_fd;
-};
-
-void handle_client(struct ClientHandlingArgs f) {
-    Server server = *f.s;
-    int client_sock_fd = f.client_sock_fd;
-
-    while (true) {
-        string msg;
-        try {
-            msg = server.receive(client_sock_fd);
-        }
-        catch (std::exception &) {
-            break;
-        }
-        string response = "you said " + msg;
-        server.sendData(client_sock_fd, response);
-    }
-    server.closeClientSock(client_sock_fd);
+// this function cannot be a Server method because it's invoked as a new thread,
+// and a new thread can only accept static functions
+void handle_client(DefaultIO* dio) {
+    CLI cli(dio);
+    cli.start();
 }
-
 
 int main() {
     int server_port = 4444;
@@ -155,8 +137,8 @@ int main() {
             continue;
         }
 
-        struct ClientHandlingArgs args { &s, client_sock_fd };
-        thread(handle_client, args).detach(); // run in parallel
+        DefaultIO* dio = new SocketIO(&s, client_sock_fd);
+        thread(handle_client, dio).detach(); // run in parallel
     }
 
     s.closeServerSock();

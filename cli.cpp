@@ -8,7 +8,6 @@
 #include "CmdUploadCsv.h"
 
 #include "DefaultIO.h"
-#include "StandardIO.h"
 
 using namespace std;
 
@@ -16,8 +15,17 @@ using namespace std;
 
 class CLI {
 private:
-    Command* commands[NUM_COMMANDS];
+    Command* commands[NUM_COMMANDS]{};
     DefaultIO* dio;
+
+    // todo add members here:
+    //  metric, k
+    //  vectors train_X, train_y (which the client sent in csv)
+    //  vectors uploaded_X (which the client sent in csv)
+
+    //  todo - the commands' constructors should accept more things
+    // for example, CmdClassify should accept a ptr to the vectors,
+    // and algoSettings should accepts pointers to metric and k
 
 public:
     CLI(DefaultIO* dio) {
@@ -44,11 +52,11 @@ public:
             dio->write(s_stream.str());
         }
         dio->write("8. exit\n");
+
+        // todo here we should loop:
+        // loop:
+        //     int number = stoi(dio->read());
+        //     commands[number]->execute();
+
     }
 };
-
-int main() {
-    StandardIO standardIo;
-    CLI cli(&standardIo);
-    cli.start();
-}
