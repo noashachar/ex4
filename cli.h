@@ -9,28 +9,26 @@
 #include "CmdDownloadResults.h"
 #include "CmdUploadCsv.h"
 #include "DefaultIO.h"
+#include "knn.h"
 
 
 #define NUM_COMMANDS 5
 
 class CLI {
 private:
-    Command* commands[NUM_COMMANDS]{};
+    Command* commands[NUM_COMMANDS];
     DefaultIO* dio;
+    Knn* knn;
 
     // todo add members here:
     //  metric, k
     //  vectors train_X, train_y (which the client sent in csv)
     //  vectors uploaded_X (which the client sent in csv)
 
-    //  todo - the commands' constructors should accept more things
-    // for example, CmdClassify should accept a ptr to the vectors,
-    // and algoSettings should accepts pointers to metric and k
-
 public:
-    CLI(DefaultIO* dio) {};
+    CLI(DefaultIO* dio);
 
-    ~CLI() {};
+    ~CLI();
 
-    void start() {};
+    void start();
 };

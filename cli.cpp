@@ -15,12 +15,16 @@ using namespace std;
 
 
 CLI::CLI(DefaultIO* dio) {
+     //  todo - the commands' constructors should accept more things
+    // for example, CmdClassify should accept a ptr to the vectors,
+    // and algoSettings should accepts pointers to metric and k
+    this->knn = new knn();
     this->dio = dio;
-    commands[0] = new CmdAlgoSettings(dio);
-    commands[1] = new CmdClassify(dio);
-    commands[2] = new CmdDisplayResults(dio);
-    commands[3] = new CmdDownloadResults(dio);
-    commands[4] = new CmdUploadCsv(dio);
+    commands[0] = new CmdUploadCsv(dio,knn);
+    commands[1] = new CmdAlgoSettings(dio,knn);
+    commands[2] = new CmdClassify(dio,knn);
+    commands[3] = new CmdDisplayResults(dio,knn);
+    commands[4] = new CmdDownloadResults(dio,knn);
 }
 
 CLI::~CLI() {
@@ -28,21 +32,30 @@ CLI::~CLI() {
         delete commands[i];
     }
     delete dio;
+    delete knn;
 }
 
 void CLI::start() {
-    dio->write("Welcome to the KNN Classifier Server. Please choose an option:\n");
+    int number = 0
+    ostringstream s_stream;
+    while(true){
+    s_stream<<("Welcome to the KNN Classifier Server. Please choose an option:\n");
     for (int i = 0; i < NUM_COMMANDS; i++) {
-        ostringstream s_stream;
         s_stream << i + 1 << ". " << commands[i]->getDescription() << endl;
-        dio->write(s_stream.str());
     }
-    dio->write("8. exit\n");
+    s_stream<<"8. exit\n";
+    dio->write(s_stream.str());
 
     // todo here we should loop:
     // loop:
-    //     int number = stoi(dio->read());
+    //     int number = stoi(dio->read())+1;
     //     commands[number]->execute();
+    
+    number = stoi(dio->read())-1;
+    if (number == 7){
+        break;
+    }
+    commands[number]->execute();
+    }
 
 }
-};

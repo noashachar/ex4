@@ -12,7 +12,7 @@ using namespace std;
 
 class CmdUploadCsv : public Command {
 public:
-    CmdUploadCsv(DefaultIO* dio) : Command(dio, "upload an unclassified csv data file") {}
+    CmdUploadCsv(DefaultIO* dio, Knn* knn) : Command(dio, "upload an unclassified csv data file", knn) {}
     void execute();
 };
 

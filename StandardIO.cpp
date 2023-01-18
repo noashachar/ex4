@@ -15,6 +15,7 @@ string StandardIO::read() {
 }
 
 // write line to user
-void StandardIO::write(string msg) {
+bool StandardIO::write(string msg) {
     cout << msg << endl;
+    return true;
 }

@@ -13,6 +13,7 @@ std::vector<double> makeDiffrencesVector(std::vector<double> &p, std::vector<dou
 
 class DistanceCalculator {
 public:
+    
     virtual double calculateDistance(std::vector<double> &v1, std::vector<double> &v2) = 0;
 
     virtual ~DistanceCalculator() = default;
@@ -21,28 +22,33 @@ public:
 class MinkowskiDistanceCalculator : public DistanceCalculator {
 public:
     int pow_num;
+    std::string name = "MIN";
     double calculateDistance(std::vector<double> &v1, std::vector<double> &v2) override;
     explicit MinkowskiDistanceCalculator(int pow_num) { this->pow_num = pow_num; }
 };
 
 class CanberraDistanceCalculator : public DistanceCalculator {
 public:
+    std::string name = "CAN";
     double calculateDistance(std::vector<double> &v1, std::vector<double> &v2) override;
 };
 
 class ChebyshevDistanceCalculator : public DistanceCalculator {
 public:
+    std::string name = "CHB";
     double calculateDistance(std::vector<double> &v1, std::vector<double> &v2) override;
 };
 
 class EuclideanDistanceCalculator : public DistanceCalculator {
 public:
+    std::string name = "AUC";
     double calculateDistance(std::vector<double> &v1, std::vector<double> &v2) override;
 };
 
 
 class ManhattanDistanceCalculator : public DistanceCalculator {
 public:
+    std::string name = "MAN";
     double calculateDistance(std::vector<double> &v1, std::vector<double> &v2) override;
 };
 

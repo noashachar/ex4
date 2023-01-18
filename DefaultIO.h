@@ -6,7 +6,7 @@
 class DefaultIO {
 public:
     virtual std::string read() = 0;
-    virtual void write(std::string) = 0;
+    virtual bool write(std::string& msg) = 0;
 
     virtual ~DefaultIO() = default;
 };

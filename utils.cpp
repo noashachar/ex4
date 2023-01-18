@@ -86,7 +86,20 @@ bool illegal(vector<vector<double>> f, vector<string> s) {
     }
     return true;
 }
-
+bool illegalPred(vector<vector<double>> f) {
+    if (f.size() < 1) {
+        std::cout << "illegal file" << endl;
+        return false;
+    }
+    unsigned int size = f[0].size();
+    for (auto& i : f) {
+        if (i.size() != size) {
+            std::cout << "illegal file" << endl;
+            return false;
+        }
+    }
+    return true;
+}
 
 //split sperates the string text put it in a vector
 //get text and some seperator- one space in our case

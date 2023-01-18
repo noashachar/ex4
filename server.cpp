@@ -16,9 +16,9 @@
 using namespace std;
 
 
-Server::Server(int port) {
-    port_no = port;
+Server::Server(const int port) {
     server_sock_fd = -1;
+    port_no = port;
 }
 
 /*
@@ -70,7 +70,7 @@ bool Server::sendData(int client_sock_fd, string &data) {
 // returns client_sock_fd or 0 if failed
 int Server::acceptClient() {
     unsigned int addr_len = sizeof(server_sockaddr);
-    int client_sock_fd = accept(server_sock_fd, (struct sockaddr *) &server_sockaddr, &addr_len);
+    client_sock_fd = accept(server_sock_fd, (struct sockaddr *) &server_sockaddr, &addr_len);
     if (client_sock_fd < 0) {
         perror("error accepting client");
         return 0;
@@ -137,7 +137,8 @@ int main() {
             continue;
         }
 
-        DefaultIO* dio = new SocketIO(&s, client_sock_fd);
+        DefaultIO* dio = new StandardIO();
+        //DefaultIO* dio = new SocketIO(client_sock_fd);
         thread(handle_client, dio).detach(); // run in parallel
     }
 

@@ -17,12 +17,14 @@
 class Server
 {
 private:
-    int server_sock_fd{};
+    int server_sock_fd;
     int port_no;
     struct sockaddr_in server_sockaddr;
+    int client_sock_fd;
+
 
 public:
-    explicit Server(int port);
+    explicit Server(const int port);
     bool openServerSocketAndBindPort();
     bool listenForClients(int MAX_CLIENTS);
     int acceptClient();

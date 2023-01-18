@@ -11,7 +11,7 @@ using namespace std;
 
 class CmdDisplayResults : public Command {
 public:
-    CmdDisplayResults(DefaultIO* dio) : Command(dio, "display results") {}
+    CmdDisplayResults(DefaultIO* dio, Knn* knn) : Command(dio, "display results", knn) {}
     void execute();
 };
 

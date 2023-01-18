@@ -3,3 +3,7 @@
 //
 
 #include "CmdDownloadResults.h"
+
+void CmdDownloadResults::execute(){
+    
+}

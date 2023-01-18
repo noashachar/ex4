@@ -11,7 +11,7 @@
 class StandardIO : public DefaultIO {
 public:
     std::string read();
-    void write(std::string);
+    bool write(std::string& msg);
 };
 
 #endif //EX4_STANDARDIO_H

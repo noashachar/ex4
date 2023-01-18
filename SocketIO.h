@@ -12,20 +12,12 @@
 
 class SocketIO : public DefaultIO {
 private:
-    Server *server;
     int client_sock_fd;
 public:
-    SocketIO(Server* server, int client_sock_fd) {
-        this->server = server;
-        this->client_sock_fd = client_sock_fd;
-    }
-
-    ~SocketIO() {
-        this->server->closeClientSock(client_sock_fd);
-    }
-
+    SocketIO(int client_sock_fd);
+    ~SocketIO();
     std::string read();
-    void write(std::string);
+    bool write(std::string& msg);
 };
 
 

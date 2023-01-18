@@ -9,7 +9,8 @@ string Command::getDescription() {
     return this->description;
 }
 
-Command::Command(DefaultIO *dio, std::string description) {
+Command::Command(DefaultIO *dio, std::string description, Knn *knn) {
     this->dio = dio;
     this->description = description;
+    this->knn = knn;
 }
