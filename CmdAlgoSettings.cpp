@@ -1,31 +1,53 @@
 //
 // Created by noash on 10/01/2023.
 //
-
+#include "utils.h"
 #include "CmdAlgoSettings.h"
 
-CmdAlgoSettings::execute(){
+void CmdAlgoSettings::execute(){
+    ostringstream s_stream;
+    bool notOk = false;
     int k = knn->getK();
     string n = knn->get_dis_name();
+
+    s_stream << "the current KNN parameters arr k = "<< k <<", distance metric = "<< n <<"\n";
+
     size_t start = 0, end;
-    dio->write("the current KNN parameters arr k = "<< k <<", distance metric = "<< n <<endl);
-    ostringstream s_stream;
+    dio->write(s_stream.str());
+    s_stream.str("");
     string text = dio->read();
     if(text!="\n"){
-        endtext = text.find("   ", start)
-        try{
-            int newK = stoi(text.substr(start, end - start));
+        int newK;
+        string name;
+        end = text.find(" ", start);
+        try {
+            newK = stoi(text.substr(start, end - start));
+            knn->setK(newK);
         }
-        catch{
+        catch (std::exception& e) {
             s_stream<<"invalid value for K\n";
+            notOk=true;
         }
-        try{
+        try {
             start = end + 1;
-            int newK = stoi(text.substr(start, end - start));
+            name = text.substr(start, end - start);
+            s_stream<<name<<" "<<endl;
+            DistanceCalculator *dc = createDistCalc(name);
+            if (dc == nullptr) {
+                s_stream<<"invalid value for metric\n";
+                delete dc;
+                notOk = true;
+            }
+            else{
+            knn->setdis(dc);
+            }
         }
-        catch{
+        catch (std::exception& e){
             s_stream<<"invalid value for metric\n";
+            notOk=true;
         }
+        if(notOk){
         dio->write(s_stream.str());
+        }
     }
 }

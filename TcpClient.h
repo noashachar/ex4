@@ -17,7 +17,7 @@ class TcpClient
     public:
         TcpClient(const char* addr, const int p);
         bool conn();
-        bool sendData(std::string data);
+        bool sendData(std::string &data);
         std::string receive(int);
         void closeConn();
 };

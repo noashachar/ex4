@@ -29,7 +29,7 @@ string SocketIO::read() {
     return reply;
 }
 
-bool SocketIO::write(string &msg) {
+bool SocketIO::write(string msg) {
         if (send(client_sock_fd, msg.c_str(), msg.length(), 0) < 0) {
         perror("Send failed :( ");
         return false;

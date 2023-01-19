@@ -89,7 +89,7 @@ string readLineFromUser() {
 /*
     Send data to the connected host
 */
-bool TcpClient::sendData(string data) {
+bool TcpClient::sendData(string &data) {
     // Send some data
     if (send(sock, data.c_str(), strlen(data.c_str()), 0) < 0) {
         perror("Send failed");

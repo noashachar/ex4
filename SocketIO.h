@@ -17,7 +17,7 @@ public:
     SocketIO(int client_sock_fd);
     ~SocketIO();
     std::string read();
-    bool write(std::string& msg);
+    bool write(std::string msg);
 };
 
 

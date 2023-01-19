@@ -7,6 +7,7 @@
 
 
 #include "Command.h"
+#include "knn.h"
 
 using namespace std;
 

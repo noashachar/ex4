@@ -21,9 +21,12 @@ Knn::Knn(vector<vector<double>> &X,vector<string> &y){
 }
 
 Knn::Knn(){
+    dis = new EuclideanDistanceCalculator;
+    knnK=5;
 }
 
-void Knn::prepareKnn(int k, DistanceCalculator *distance, vector<double> input_vec){
+void Knn::prepareKnn(int k, DistanceCalculator *distance, vector<double> &input_vec){
+    delete dis;
     knnK = k;
     dis = distance;
     t = input_vec;
@@ -35,27 +38,36 @@ void Knn::dataKnn(vector<vector<double>> &X,vector<string> &y){
 }
 
 void Knn::unclass(std::vector<std::vector<double>> &unknnX){
-    this->unknnX = unknnX
+    this->unknnX = unknnX;
 }
 
 void Knn::setPred(std::vector<std::string> &y){
-    pred = y;
+    this->pred = y;
 }
 void Knn::setdis(DistanceCalculator *distance){
-    dis = distance;
+    delete dis;
+    this->dis = distance;
 }
 void Knn::setK(int k){
     knnK = k;
 }
 
-std::vector<std::string> getPred(){
-    return pred;
+std::vector<std::string> Knn::getPred(){
+    return this->pred;
 }
-string get_dis_name(){
-    return dis->name;
+string Knn::get_dis_name(){
+        return dis->name;
 }
-int getK(){
+
+int Knn::getK(){
     return knnK;
+}
+
+std::vector<std::vector<double>> Knn::getknnX(){
+    return knnX;
+}
+std::vector<std::vector<double>> Knn::getunknnX(){
+    return unknnX;
 }
 
 //return Distances between self vector to data vectors as a arr

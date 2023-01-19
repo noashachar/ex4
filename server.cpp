@@ -11,7 +11,7 @@
 #include <algorithm>
 
 #include "SocketIO.h"
-#include "cli.cpp"
+#include "cli.h"
 
 using namespace std;
 
@@ -118,6 +118,9 @@ void handle_client(DefaultIO* dio) {
 }
 
 int main() {
+    int i=0;
+    string str;
+    thread threads[10];
     int server_port = 4444;
     Server s(server_port);
     if (!s.openServerSocketAndBindPort()) {
@@ -128,20 +131,28 @@ int main() {
         perror("could not listen for clients");
         return 2;
     }
-
     // this loop for each client
-    while (true) {
+    while (false) {
         int client_sock_fd = s.acceptClient();
         if (!client_sock_fd) {
             perror("could not accept client");
             continue;
         }
 
-        DefaultIO* dio = new StandardIO();
-        //DefaultIO* dio = new SocketIO(client_sock_fd);
-        thread(handle_client, dio).detach(); // run in parallel
+        DefaultIO* dio = new SocketIO(client_sock_fd);
+        threads[i++] = thread(handle_client, dio);// run in parallel
+        if (i>= 5){
+            i=0;
+            while (i < 5) {
+            threads[i++].join();}
+            i=0;
+        }
     }
 
+    DefaultIO* dio = new StandardIO();
+    str = dio->read();
+    threads[i++] = thread(handle_client, dio); // run in parallel
+    threads[0].join();
     s.closeServerSock();
     return 0;
 }

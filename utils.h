@@ -11,7 +11,7 @@
 
 DistanceCalculator* createDistCalc(std::string &name) ;
 bool illegal(std::vector<std::vector<double>> f, std::vector<std::string> s);
-bool illegalPred(vector<vector<double>> f);
+bool illegalPred(std::vector<std::vector<double>> f);
 std::vector<double> split(const std::string &text, char sep);
 std::pair<std::vector<std::vector<double>>, std::vector<std::string>> readFileToVectors(std::string &path);
 

@@ -27,12 +27,14 @@ class Knn {
     void setdis(DistanceCalculator *distance);
     void setK(int k);
     std::vector<std::string> getPred();
-    string get_dis_name();
+    std::vector<std::vector<double>> getknnX();
+    std::vector<std::vector<double>> getunknnX();
+    std::string get_dis_name();
     int getK();
     void dataKnn(std::vector<std::vector<double>> &X,std::vector<std::string> &y);
     void prepareKnn(int k, DistanceCalculator *distance, std::vector<double> &input_vec);
     std::vector<double> getDistances();
-    vector<double> Knn::getDistances(int num);
+    std::vector<double> getDistances(int num);
     std::vector<std::string> neighborsLabels(std::vector<double> distances);
     std::string getBetterLbels(std::vector<std::string> neighborsLabels);
 };

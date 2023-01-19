@@ -5,8 +5,12 @@
 #ifndef EX4_COMMAND_H
 #define EX4_COMMAND_H
 
+#include <sstream>
 #include <string>
 #include "DefaultIO.h"
+#include <iostream>
+#include "knn.h"
+#include <vector>
 
 class Command {
 protected:

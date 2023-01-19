@@ -1,36 +1,39 @@
 //
 // Created by noash on 10/01/2023.
 //
-
+#include "utils.h"
 #include "CmdUploadCsv.h"
 #include "utils.h"
 
 void CmdUploadCsv::execute(){
-    dio->write("Please upload your local train CSV file.");
+    std::pair<vector<vector<double>>, vector<string>> zug;
     ostringstream s_stream;
-    path = dio->read()
+    s_stream<<"Please upload your local train CSV file.\n";
+    dio->write(s_stream.str());
+    s_stream.str("");
+    string path = dio->read();
     zug = readFileToVectors(path);
-    auto X = zug.first;
-    auto y = zug.second;
+    vector<vector<double>> X = zug.first;
+    vector<string> y = zug.second;
     if (!illegal(X, y)) {
-        s_stream.clear();
-        s_stream <<"invalid input\n"
+        s_stream.str("");
+        s_stream <<"invalid input\n";
         dio->write(s_stream.str());
     }
     else{
-    Knn->dataKnn(&X, &y);
+    knn->dataKnn(X, y);
     s_stream<<"Upload complete\n"<<"Please upload your local test CSV file.\n";
     dio->write(s_stream.str());
-    path = dio->read()
+    path = dio->read();
     zug = readFileToVectors(path);
-    auto PREX = zug.first;
-    if (!illegalPred(X)) {
-        s_stream.clear();
-        s_stream <<"invalid input\n"
+    vector<vector<double>> preX = zug.first;
+    if (!illegalPred(preX)) {
+        s_stream.str("");
+        s_stream <<"invalid input\n";
         dio->write(s_stream.str());
     }
     else{
-        knn->unclass(std::vector<std::vector<double>> &unknnX);
+        knn->unclass(preX);
         dio->write("Upload complete\n");
         }
     }

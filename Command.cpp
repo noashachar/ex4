@@ -2,6 +2,11 @@
 // Created by noash on 10/01/2023.
 //
 
+#include <sstream>
+#include <iostream>
+#include <string>
+#include "knn.h"
+#include <vector>
 #include "Command.h"
 using namespace std;
 
