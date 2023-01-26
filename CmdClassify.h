@@ -11,7 +11,7 @@ using namespace std;
 
 class CmdClassify : public Command {
 public:
-    CmdClassify(DefaultIO* dio) : Command(dio, "classify data") {}
+    CmdClassify(DefaultIO* dio, Knn* knn) : Command(dio, "classify data", knn) {}
     void execute();
 };
 

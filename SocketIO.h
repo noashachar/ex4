@@ -5,29 +5,28 @@
 #ifndef EX4_SOCKETIO_H
 #define EX4_SOCKETIO_H
 
-
 #include <string>
 #include "DefaultIO.h"
 #include "server.h"
+#include <mutex>
 
-class SocketIO : public DefaultIO {
+
+class SocketIO : public DefaultIO
+{
 private:
-    Server *server;
     int client_sock_fd;
+    std::mutex sendGuard;
+
 public:
-    SocketIO(Server* server, int client_sock_fd) {
-        this->server = server;
-        this->client_sock_fd = client_sock_fd;
-    }
-
-    ~SocketIO() {
-        this->server->closeClientSock(client_sock_fd);
-    }
-
+    SocketIO(int client_sock_fd);
+    ~SocketIO();
     std::string read();
-    void write(std::string);
+    void write(std::string msg);
 };
 
+struct SocketIoConnectionEnded : public std::exception
+{
+    const char *what() const throw();
+};
 
-
-#endif //EX4_SOCKETIO_H
+#endif // EX4_SOCKETIO_H

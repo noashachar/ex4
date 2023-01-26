@@ -11,7 +11,7 @@ using namespace std;
 
 class CmdAlgoSettings : public Command {
 public:
-    CmdAlgoSettings(DefaultIO* dio) : Command(dio, "algorithm settings") {}
+    CmdAlgoSettings(DefaultIO* dio, Knn* knn) : Command(dio, "algorithm settings", knn) {}
     void execute();
 };
 

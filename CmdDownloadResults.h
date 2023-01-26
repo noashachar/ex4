@@ -7,12 +7,13 @@
 
 
 #include "Command.h"
+#include "knn.h"
 
 using namespace std;
 
 class CmdDownloadResults : public Command {
 public:
-    CmdDownloadResults(DefaultIO* dio) : Command(dio, "download results") {}
+    CmdDownloadResults(DefaultIO* dio, Knn* knn) : Command(dio, "download results", knn) {}
     void execute();
 };
 

@@ -68,25 +68,33 @@ pair<vector<vector<double>>, vector<string>> readFileToVectors(string& path)
     return make_pair(content, tag);
 }
 
-bool illegal(vector<vector<double>> f, vector<string> s) {
+bool is_legal(vector<vector<double>>& f, vector<string>& s) {
     if (f.size() != s.size()) {
-        std::cout << "illegal file" << endl;
         return false;
     }
     if (f.size() < 1) {
-        std::cout << "illegal file" << endl;
         return false;
     }
     unsigned int size = f[0].size();
     for (auto& i : f) {
         if (i.size() != size) {
-            std::cout << "illegal file" << endl;
             return false;
         }
     }
     return true;
 }
-
+bool is_legalPred(vector<vector<double>> f) {
+    if (f.size() < 1) {
+        return false;
+    }
+    unsigned int size = f[0].size();
+    for (auto& i : f) {
+        if (i.size() != size) {
+            return false;
+        }
+    }
+    return true;
+}
 
 //split sperates the string text put it in a vector
 //get text and some seperator- one space in our case

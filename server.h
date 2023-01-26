@@ -17,17 +17,16 @@
 class Server
 {
 private:
-    int server_sock_fd{};
+    int server_sock_fd;
     int port_no;
     struct sockaddr_in server_sockaddr;
 
 public:
-    explicit Server(int port);
+    explicit Server(const int port);
     bool openServerSocketAndBindPort();
     bool listenForClients(int MAX_CLIENTS);
     int acceptClient();
     bool sendData(int client_sock_fd, std::string& data);
-    std::string receive(int client_sock_fd, int size);
     void closeClientSock(int client_sock_fd);
     void closeServerSock();
 };
