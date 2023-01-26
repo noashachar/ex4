@@ -1,166 +1,256 @@
 #include <iostream>
-#include <sys/socket.h>
-#include <stdio.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
+#include <string>
 #include <unistd.h>
-#include <string.h>
-#include "TcpClient.h"
-#include "utils.h"
+#include <netdb.h>
+#include <sys/socket.h>
+#include <sys/select.h>
+#include <chrono>
+#include <thread>
+#include <vector>
+#include <fstream>
 
+void send_to_server(int sock, const std::string &message)
+{
+  // also send the \0 so that empty strings can be transmitted!
+  int bytes_sent = send(sock, message.c_str(), message.size() + 1, 0);
+  if (bytes_sent <= 0)
+  {
+    std::cerr << "error occurred while writing to server" << std::endl;
+    exit(EXIT_FAILURE);
+  }
 
-bool is_valid_ipv4(const std::string& ip_address) {
-    // Make sure the IP address is not empty
-    if (ip_address.empty()) {
-        return false;
-    }
-
-    // Check if the IP address consists of four octets separated by dots
-    int num_dots = 0;
-    for (char c : ip_address) {
-        if (c == '.') {
-            num_dots++;
-        } else if (!isdigit(c)) {
-            return false;
-        }
-    }
-    if (num_dots != 3) {
-        return false;
-    }
-
-    // Split the IP address into its octets
-    int octet1, octet2, octet3, octet4;
-    int num_octets = sscanf(ip_address.c_str(), "%d.%d.%d.%d", &octet1, &octet2, &octet3, &octet4);
-
-    // Make sure we parsed exactly four octets
-    if (num_octets != 4) {
-        return false;
-    }
-
-    // Make sure each octet is in the correct range (0-255)
-    return octet1 >= 0 && octet1 <= 255 && octet2 >= 0 && octet2 <= 255 && octet3 >= 0 && octet3 <= 255 && octet4 >= 0 && octet4 <= 255;
+  // to disable msg batching (Nagle's Algorithm)
+  std::this_thread::sleep_for(std::chrono::milliseconds(75));
 }
 
-
-
-using namespace std;
-//"127.0.0.1"
-/*
-    constructor
-*/
-TcpClient::TcpClient(const char *addr, const int p) {
-    sock = -1;
-    port_no = p;
-    ip_address = addr;
+bool startsWith(const char *buffer, const std::string &prefix)
+{
+  return strncmp(buffer, prefix.c_str(), prefix.length()) == 0;
 }
 
-/*
-    Connect to a host on a certain port number
-*/
-bool TcpClient::conn() {
-    // create socket if it is not already created
-    if (sock == -1) {
-        //Create socket
-        sock = socket(AF_INET, SOCK_STREAM, 0);
-        if (sock < 0) {
-            perror("error creating socket");
-            return false;
-        }
+void uploadFileToServer(const char *path, int sock)
+{
+  std::string line;
+  std::ifstream myfile;
+  myfile.open(path);
 
-        memset(&sin, 0, sizeof(sin));
-        sin.sin_family = AF_INET;
-        sin.sin_addr.s_addr = inet_addr(ip_address);
-        sin.sin_port = htons(port_no);
-        if (connect(sock, (struct sockaddr *) &sin, sizeof(sin)) < 0) {
-            perror("error connecting to server");
-            return false;
-        }
+  if (myfile.is_open())
+  {
+    while (getline(myfile, line))
+    {
+      send_to_server(sock, line);
     }
+  }
+  else
+  {
+    std::cout << "could not read file: " << path << std::endl;
+  }
 
-    return true;
+  static const std::string DONE = "!done";
+  send_to_server(sock, DONE);
 }
 
-string readLineFromUser() {
-    string text;
-    getline(cin, text);
-    return text;
+struct DownloadThread_Args {
+  std::string path;
+  int sock;
+  std::ofstream* filePtr;
+
+  DownloadThread_Args(std::string path, int sock, std::ofstream* filePtr) 
+    : path(path), sock(sock), filePtr(filePtr) { }
+};
+
+void downloadFileFromServer(DownloadThread_Args args)
+{
+  const std::string this_thread_prefix = "$" + args.path + ": ";
+  char buffer[4096];
+
+  std::ofstream& file = *args.filePtr;
+
+  while (true)
+  {
+    int bytes_received = recv(args.sock, buffer, sizeof(buffer), MSG_PEEK);
+    if (bytes_received <= 0)
+    {
+      std::cerr << "error while downloading: recv failed" << std::endl;
+      break;
+    }
+
+    // the message is promised to end with '\0' by the server!
+    const std::string raw_msg(buffer);
+
+    // if it doesn't start with our prefix, it's not for us
+    if (raw_msg.rfind(this_thread_prefix, 0) != 0) continue;
+
+    // pop the message from the queue
+    int raw_msg_len = recv(args.sock, buffer, sizeof(buffer), 0);
+    if (raw_msg_len <= 0)
+    {
+      std::cerr << "error while downloading: recv with no flags failed" << std::endl;
+      break;
+    }
+
+    const std::string msg = raw_msg.substr(this_thread_prefix.length());
+
+    if (msg == "!done") break;
+
+    if (args.filePtr->is_open()) *args.filePtr << msg << std::endl;
+  }
+
+  if (args.filePtr->is_open()) args.filePtr->close();
+
+  delete args.filePtr;
 }
 
-/*
-    Send data to the connected host
-*/
-bool TcpClient::sendData(string data) {
-    // Send some data
-    if (send(sock, data.c_str(), strlen(data.c_str()), 0) < 0) {
-        perror("Send failed");
-        return false;
+void handleSpecialCommands(int sock, const char *cmd, std::vector<std::thread*>& downloads)
+{
+  static const std::string UPLOAD_PREFIX = "!upload:";
+
+  if (startsWith(cmd, UPLOAD_PREFIX))
+  {
+    const char *path = cmd + UPLOAD_PREFIX.length();
+    uploadFileToServer(path, sock);
+  }
+
+  static const std::string DOWNLOAD_PREFIX = "!download:";
+
+  if (startsWith(cmd, DOWNLOAD_PREFIX))
+  {
+    std::string path = cmd + DOWNLOAD_PREFIX.length();
+
+    std::ofstream* filePtr = new std::ofstream(path);
+    if (!filePtr->is_open())
+    {
+      std::cerr << "error: cannot write to: `" << path << "`" << std::endl;
+      // no return,
+      // becuase the thread must pull its "$download messages from the socket queue
     }
-    return true;
+
+    auto args = DownloadThread_Args(path, sock, filePtr);
+    downloads.push_back( new std::thread(downloadFileFromServer, args) );
+  }
 }
 
-/*
-    Receive data from the connected host
-*/
-string TcpClient::receive(int size = 4096) {
-    char buffer[size];
-    string reply;
+int main(int argc, char *argv[])
+{
+  if (argc < 3)
+  {
+    std::cout << "usage: " << argv[0] << " hostname port" << std::endl;
+    exit(EXIT_FAILURE);
+  }
 
-    //Receive a reply from the server
-    if (recv(sock, buffer, sizeof(buffer), 0) < 0) {
-        puts("recv failed");
-        throw exception();
+  int sock = socket(AF_INET, SOCK_STREAM, 0);
+  if (sock < 0)
+  {
+    std::cout << "failed to create socket" << std::endl;
+    exit(EXIT_FAILURE);
+  }
+
+  hostent *server = gethostbyname(argv[1]);
+  if (server == nullptr)
+  {
+    std::cout << "failed to resolve hostname" << std::endl;
+    exit(EXIT_FAILURE);
+  }
+
+  sockaddr_in server_address;
+  server_address.sin_family = AF_INET;
+  server_address.sin_port = htons(std::stoi(argv[2]));
+  memcpy(&server_address.sin_addr.s_addr, server->h_addr, server->h_length);
+
+  if (connect(sock, (sockaddr *)&server_address, sizeof(server_address)) < 0)
+  {
+    std::cout << "failed to connect to server" << std::endl;
+    exit(EXIT_FAILURE);
+  }
+
+  fd_set readfds, writefds;
+  int max_fd = std::max(sock, STDIN_FILENO) + 1;
+
+  std::vector<std::thread*> downloads;
+  std::string input;
+
+  while (true)
+  {
+    FD_ZERO(&readfds);
+    FD_ZERO(&writefds);
+
+    // Add the socket and standard input to the read set
+    FD_SET(sock, &readfds);
+    FD_SET(STDIN_FILENO, &readfds);
+
+    // Add the socket to the write set if there is data to send
+    if (!input.empty())
+    {
+      FD_SET(sock, &writefds);
     }
 
-    reply = buffer;
-    return reply;
-}
+    // Wait for data to be available on any of the file descriptors
+    int result = select(max_fd, &readfds, &writefds, nullptr, nullptr);
+    if (result < 0)
+    {
+      std::cout << "error occurred during select" << std::endl;
+      break;
+    }
 
-void TcpClient::closeConn() {
-    if (sock != -1) {
-        close(sock);
-    }
-}
+    if (FD_ISSET(STDIN_FILENO, &readfds))
+    {
+      std::getline(std::cin, input);
 
-int main(int argc, char *argv[]) {
-    if (argc != 3) {
-        cout << "error: wrong number of args" << endl;
-        return 1;
+      // normally it'd be set if there's something in std;
+      // we want to set it even if the user has typed an empty line,
+      // so that empty lines, too, will be sent to the server.
+      if (input.empty()) FD_SET(sock, &writefds);
+    
+      else if (input == "8") break;
     }
-    int port;
-    try {
-        port = stoi(argv[2]);
-        if (port <= 0 || port >= 65536) {
-            cout << "error: port out of range" << endl;
-            return 2;
-        }
+
+    if (FD_ISSET(sock, &writefds))
+    {
+      send_to_server(sock, input);
+      input.clear();
     }
-    catch (exception &) {
-        cout << "error: invalid port" << endl;
-        return 35;
+
+    if (FD_ISSET(sock, &readfds))
+    {
+      char buffer[4096];
+      int bytes_received = recv(sock, buffer, sizeof(buffer), MSG_PEEK);
+      if (bytes_received <= 0)
+      {
+        // std::cout << "connection closed by server" << std::endl;
+        exit(EXIT_FAILURE);
+      }
+
+      // the message is promised to end with '\0' by the server!
+
+      if (buffer[0] == '$') continue;
+
+      // pop the message from the queue
+      if (recv(sock, buffer, sizeof(buffer), 0) <= 0)
+      {
+        std::cout << "error reading from server: recv with no flags failed" << std::endl;
+        break;
+      }
+
+      if (buffer[0] == '!')
+      {
+        handleSpecialCommands(sock, buffer, downloads);
+      }
+      else
+      {
+        std::cout << buffer << std::endl;
+      }
     }
-    string ip = argv[1];
-    if (!is_valid_ipv4(ip)) {
-        cout << "error: <" << ip << "> is not a valid ipv4 address" << endl;
-        return 93;
-    }
-    TcpClient c(ip.c_str(), port);
-    if (!c.conn()) {
-        perror("could not connect to server");
-        return 44;
-    }
-    std::string userInput = readLineFromUser();
-    while (userInput != "-1") {
-        if (!c.sendData(userInput)) {
-            perror("could no send data to server");
-            return 7;
-        }
-        try {
-            cout << c.receive() << endl;
-        }
-        catch (exception &) {
-            perror("could not read data from server");
-        }
-        userInput = readLineFromUser();
-    }
-    c.closeConn();
+  }
+
+  // if we want to quit, let's just finish the downloads first
+  // todo only print if some threads are still alive
+  std::cout << "waiting for downloads to finish..." << std::endl;
+  for (const auto downloadThread : downloads)
+  {
+    downloadThread->join();
+    delete downloadThread;
+  }
+
+  close(sock);
+  return 0;
 }

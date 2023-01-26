@@ -7,37 +7,37 @@
 #include <string.h>
 #include "server.h"
 #include <vector>
-#include "utils.h"
-#include "distances.h"
-#include "knn.h"
+#include <thread>
+#include <algorithm>
+
+#include "SocketIO.h"
+#include "cli.h"
 
 using namespace std;
-//"127.0.0.1"
-/*
-    constructor
-*/
-Server::Server(const int p) {
-    sock = -1;
-    port_no = p;
+
+
+Server::Server(const int port) {
+    server_sock_fd = -1;
+    port_no = port;
 }
 
 /*
     Connect to a host on a certain port number
 */
-bool Server::conn() {
+bool Server::openServerSocketAndBindPort() {
     // create socket if it is not already created
-    if (sock == -1) {
+    if (server_sock_fd == -1) {
         //Create socket
-        sock = socket(AF_INET, SOCK_STREAM, 0);
-        if (sock < 0) {
+        server_sock_fd = socket(AF_INET, SOCK_STREAM, 0);
+        if (server_sock_fd < 0) {
             perror("error creating socket");
             return false;
         }
-        memset(&client_sin, 0, sizeof(client_sin));
-        client_sin.sin_family = AF_INET;
-        client_sin.sin_addr.s_addr = INADDR_ANY;
-        client_sin.sin_port = htons(port_no);
-        if (bind(sock, (struct sockaddr *) &client_sin, sizeof(client_sin)) < 0) {
+        memset(&server_sockaddr, 0, sizeof(server_sockaddr));
+        server_sockaddr.sin_family = AF_INET;
+        server_sockaddr.sin_addr.s_addr = INADDR_ANY;
+        server_sockaddr.sin_port = htons(port_no);
+        if (::bind(server_sock_fd, (struct sockaddr *) &server_sockaddr, sizeof(server_sockaddr)) < 0) {
             perror("error binding socket");
             return false;
         }
@@ -45,8 +45,8 @@ bool Server::conn() {
     return true;
 }
 
-bool Server::listenToClient(int n = 5) {
-    if (listen(sock, n) < 0) {
+bool Server::listenForClients(int MAX_CLIENTS = 5) {
+    if (listen(server_sock_fd, MAX_CLIENTS) < 0) {
         perror("error listening to a socket");
         return false;
     }
@@ -57,9 +57,9 @@ bool Server::listenToClient(int n = 5) {
 /*
     Send data to the connected host
 */
-bool Server::sendData(string data) {
+bool Server::sendData(int client_sock_fd, string &data) {
     // Send some data
-    if (send(client_sock, data.c_str(), data.length(), 0) < 0) {
+    if (send(client_sock_fd, data.c_str(), data.length(), 0) < 0) {
         perror("Send failed :( ");
         return false;
     }
@@ -67,155 +67,79 @@ bool Server::sendData(string data) {
     return true;
 }
 
-bool Server::acceptClient() {
-    unsigned int addr_len = sizeof(client_sin);
-    client_sock = accept(sock, (struct sockaddr *) &client_sin, &addr_len);
-    if (client_sock < 0) {
+// returns client_sock_fd or 0 if failed
+int Server::acceptClient() {
+    unsigned int addr_len = sizeof(server_sockaddr);
+    int client_sock_fd = accept(server_sock_fd, (struct sockaddr *) &server_sockaddr, &addr_len);
+    if (client_sock_fd < 0) {
         perror("error accepting client");
-        return false;
+        return 0;
     }
-    return true;
-}
-
-/*
-    Receive data from the connected host
-*/
-string Server::receive(int size = 4096) {
-    char buffer[size];
-    string reply;
-    int read_bytes = recv(client_sock, buffer, sizeof(buffer), 0);
-    reply = buffer;
-    memset(buffer, 0, sizeof(buffer));
-
-    if (read_bytes <= 0) {
-        // either client sent empty line or cwe could not read
-        return "-1";
-    }
-
-    return reply;
+    return client_sock_fd;
 }
 
 
-void Server::closeConn() {
-    int result = close(client_sock);
+void Server::closeClientSock(int client_sock_fd) {
+    int result = close(client_sock_fd);
     if (result < 0) {
         perror("could not close socket with client");
     }
 }
 
-bool parseUserInput(
-        vector<double> *userVec,
-        string *distFuncName,
-        int *k,
-        string &ans,
-        vector<vector<double>> &X
-) {
-    try {
-        //get place of last
-        auto pk = ans.find_last_of(' ');
-        //get the last str
-        *k = stoi(ans.substr(pk));
-        //get pace pf one before last
-        auto pd = ans.substr(0, pk).find_last_of(' ');
-        //get one before last str
-        *distFuncName = ans.substr(1, pk - 1).substr(pd);
-        *userVec = split(ans.substr(0, pd), ' ');
+void Server::closeServerSock() {
+    int result = close(server_sock_fd);
+    if (result < 0) {
+        perror("could not close server socket");
     }
-    catch (std::exception &e) {
-        return false;
-    }
-    if (userVec->size() != X[0].size()) {
-        return false;
-    }
-    return true;
 }
 
-int main(int argc, char *argv[]) {
-    //read file
-    if (argc != 3) {
-        cout << "wrong number of args" << endl;
-        return 3;
-    }
-    string path = argv[1];
-    std::pair<vector<vector<double>>, vector<string>> zug;
-
-    zug = readFileToVectors(path);
-
-    auto X = zug.first;
-    auto y = zug.second;
-    if (!illegal(X, y)) {
-        perror("file invalid");
-        return -1;
-    }
-    Knn prediction_x(X, y);
-    //get port
-    int server_port;
+// this function cannot be a Server method because it's invoked as a new thread,
+// and a new thread can only accept static functions
+void handle_client(DefaultIO* dio) {
+    CLI cli(dio);
     try {
-        server_port = stoi(argv[2]);
-        if (server_port <= 0 || server_port >= 65536) {
-            perror("port out of range");
-            return 7;
-        }
+        cli.start();
     }
-    catch (exception &) {
-        perror("port invalid");
-        return -2;
+    catch (SocketIoConnectionEnded&) {} // if client disconnects, ignore.
+}
+
+int main(int argc, char* argv[]) {
+
+    if (argc != 2) {
+        std::cout << "usage: " << argv[0] << " port" << std::endl;
+        return 1;
     }
+
+    try {
+        stoi(argv[1]);
+    }
+    catch (std::exception&) {
+        std::cout << "usage: " << argv[0] << " port" << std::endl;
+        return 1;
+    }
+
+    int server_port = stoi(argv[1]);
     Server s(server_port);
-    if (!s.conn()) {
+    if (!s.openServerSocketAndBindPort()) {
         perror("server could not connect");
         return 1;
     }
-    if (!s.listenToClient()) {
+    if (!s.listenForClients()) {
         perror("could not listen for clients");
         return 2;
     }
-    string ans, prediction;
-
     // this loop for each client
-    while (true) {
-        if (!s.acceptClient()) {
+    while (true) {     
+        int client_sock_fd = s.acceptClient();
+        if (!client_sock_fd) {
             perror("could not accept client");
             continue;
         }
 
-        // this loop for each line from our client
-        while (true) {
-            ans = s.receive();
-            if (ans == "-1") {
-                break; // out of the "for each line" loop
-            }
-
-            vector<double> userVec;
-            string distFuncName;
-            int k;
-
-            bool isOk = parseUserInput(&userVec, &distFuncName, &k, ans, X);
-
-            DistanceCalculator *dc = createDistCalc(distFuncName);
-            if (dc == nullptr) {
-                isOk = false;
-            }
-
-            if (isOk) {
-                prediction_x.prepareKnn(k, dc, userVec);
-                vector<double> dis = prediction_x.getDistances();
-                vector<string> k_tags = prediction_x.neighborsLabels(dis);
-                prediction = prediction_x.getBetterLbels(k_tags);
-                delete dc;
-            } else {
-                prediction = "invalid input";
-            }
-
-
-            if (!s.sendData(prediction)) {
-                perror("could not send data to client");
-                break; // closeConn with client
-            }
-        }
-
-        s.closeConn();
+        DefaultIO* dio = new SocketIO(client_sock_fd);
+        thread(handle_client, dio).detach();// run in parallel
     }
 
+    s.closeServerSock();
     return 0;
 }

@@ -1,3 +1,11 @@
+//
+// Created by noash on 10/01/2023.
+//
+
+#ifndef EX4_SERVER_H
+#define EX4_SERVER_H
+
+
 #include <iostream>
 #include <sys/socket.h>
 #include <stdio.h>
@@ -9,17 +17,18 @@
 class Server
 {
 private:
-    int sock;
+    int server_sock_fd;
     int port_no;
-    struct sockaddr_in client_sin;
-    int client_sock;
+    struct sockaddr_in server_sockaddr;
 
 public:
-    Server(const int p);
-    bool conn();
-    bool listenToClient(int);
-    bool acceptClient();
-    bool sendData(std::string data);
-    std::string receive(int);
-    void closeConn();
+    explicit Server(const int port);
+    bool openServerSocketAndBindPort();
+    bool listenForClients(int MAX_CLIENTS);
+    int acceptClient();
+    bool sendData(int client_sock_fd, std::string& data);
+    void closeClientSock(int client_sock_fd);
+    void closeServerSock();
 };
+
+#endif //EX4_SERVER_H
