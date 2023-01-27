@@ -1,10 +1,13 @@
 all: server.out client.out
 
-client.out: TcpClient.cpp TcpClient.h
-	g++ -std=c++11 TcpClient.cpp -o client.out
+client.out: client.o threadSafeQueue.o
+	g++ -std=c++11 client.o threadSafeQueue.o -pthread -o client.out
 
-client.o: TcpClient.cpp
-	g++ -std=c++11 -c TcpClient.cpp
+client.o: TcpClient.cpp TcpClient.h
+	g++ -std=c++11 -c TcpClient.cpp -o client.o
+
+threadSafeQueue.o: threadSafeQueue.cpp
+	g++ -std=c++11 -c threadSafeQueue.cpp -o threadSafeQueue.o
 
 server.out: server.o distances.o utils.o knn.o StandardIO.o SocketIO.o Command.o CmdUploadCsv.o CmdDownloadResults.o CmdDisplayResults.o CmdClassify.o CmdAlgoSettings.o cli.o DefaultIO.h
 	g++ -std=c++11 -pthread server.o distances.o utils.o knn.o StandardIO.o SocketIO.o  Command.o CmdUploadCsv.o CmdDownloadResults.o CmdDisplayResults.o CmdClassify.o CmdAlgoSettings.o cli.o -o server.out

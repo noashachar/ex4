@@ -10,8 +10,8 @@
 
 class StandardIO : public DefaultIO {
 public:
-    std::string read();
-    void write(std::string msg);
+    std::string read() override;
+    void write(std::string msg) override;
 };
 
 #endif //EX4_STANDARDIO_H

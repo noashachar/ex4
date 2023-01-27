@@ -18,15 +18,15 @@ private:
     std::mutex sendGuard;
 
 public:
-    SocketIO(int client_sock_fd);
-    ~SocketIO();
-    std::string read();
-    void write(std::string msg);
+    explicit SocketIO(int client_sock_fd);
+    ~SocketIO() override;
+    std::string read() override;
+    void write(std::string msg) override;
 };
 
 struct SocketIoConnectionEnded : public std::exception
 {
-    const char *what() const throw();
+    const char *what() const noexcept override;
 };
 
 #endif // EX4_SOCKETIO_H

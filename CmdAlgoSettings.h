@@ -7,7 +7,7 @@
 
 #include "Command.h"
 
-using namespace std;
+
 
 class CmdAlgoSettings : public Command {
 public:

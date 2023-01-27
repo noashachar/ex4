@@ -7,7 +7,7 @@
 
 #include "Command.h"
 
-using namespace std;
+
 
 class CmdClassify : public Command {
 public:

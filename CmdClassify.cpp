@@ -5,11 +5,11 @@
 
 
 void CmdClassify::execute(){
-    ostringstream s_stream;
-    vector<double> dis;
-    vector<string> k_tags;
+    std::ostringstream s_stream;
+    std::vector<double> dis;
+    std::vector<std::string> k_tags;
     std::string prediction; 
-    vector<string> pred;
+    std::vector<std::string> pred;
     if( knn->getunknnX().size()<1){
         s_stream<<"please upload data";
     }

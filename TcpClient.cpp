@@ -12,58 +12,12 @@
 #include <vector>
 #include <fstream>
 #include <unordered_map>
-#include <deque>
-#include <mutex>
-#include <condition_variable>
+
+#include "TcpClient.h"
 
 const std::string
         CLOSE_SOCKET_PREFIX = "CLOSE_SOCKET:",
         UPLOAD_PREFIX = "!upload:";
-
-std::vector<std::string> splitBy(const std::string &s, char delimiter)
-{
-    size_t pos_start = 0, pos_end;
-    std::string token;
-    std::vector<std::string> res;
-
-    while ((pos_end = s.find(delimiter, pos_start)) != std::string::npos)
-    {
-        token = s.substr(pos_start, pos_end - pos_start);
-        pos_start = pos_end + 1;
-        res.push_back(token);
-    }
-
-    res.push_back(s.substr(pos_start));
-    return res;
-}
-
-template <typename T>
-class ThreadSafeQueue
-{
-private:
-    std::deque<T> q;
-    std::mutex m;
-    std::condition_variable cv;
-
-public:
-    void push(T item)
-    {
-        std::unique_lock<std::mutex> lock(m);
-        q.push_back(item);
-        lock.unlock();
-        cv.notify_one();
-    }
-
-    T pop()
-    {
-        std::unique_lock<std::mutex> lock(m);
-        cv.wait(lock, [this]()
-        { return !q.empty(); });
-        T item = q.front();
-        q.pop_front();
-        return item;
-    }
-};
 
 void sendToServer(int sock, const std::string &message)
 {
@@ -80,21 +34,10 @@ void sendToServer(int sock, const std::string &message)
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
 }
 
-struct ArgsForDownloadWorder
-{
-    ThreadSafeQueue<std::string> *q;
-    // q will contains messages like:
-    // name-of-file.txt: some line to append to the file
-    // name-of-file.txt: another line to append to the file
-    // different-file.txt: some line some text blah blah
-    // name-of-file.txt: !done (this is a special message meaning - close the file)
 
-    int *noDownloadsHappening;
-    // the downloader thread will change this variable to communicate with the main thread
-};
 
 // runs in a separate thread
-void downloadingWorker(struct ArgsForDownloadWorder args)
+void downloadingWorker(struct ArgsForDownloadWorker args)
 {
     int sock_to_close = 0;
     // the main thread will send us its socket number when the user wants to quit.
@@ -118,14 +61,15 @@ void downloadingWorker(struct ArgsForDownloadWorder args)
         // a message to us will look like this:
         // name-of-file.txt: some line to append to the file
 
-        auto parts = splitBy(msg, ':');
-        std::string filename = parts[0];
-        std::string lineToAppend = parts[1].substr(1); // start after the space
+        // filename.txt: this is a line
+        size_t indexOfColon = msg.find(':');
+        std::string filename = msg.substr(0, indexOfColon);
+        std::string lineToAppend = msg.substr(indexOfColon + 2); // start after the space
 
         // if this file isn't already open
         if (openFiles.find(filename) == openFiles.end())
         {
-            std::ofstream *file = new std::ofstream;
+            auto *file = new std::ofstream;
             file->open(filename);
             if (file->fail())
             {
@@ -232,7 +176,7 @@ int main(int argc, char *argv[])
 
     ThreadSafeQueue<std::string> q;
     int noDownloadsHappening = true;
-    struct ArgsForDownloadWorder args = {&q, &noDownloadsHappening};
+    struct ArgsForDownloadWorker args = {&q, &noDownloadsHappening};
     std::thread download_thread(downloadingWorker, args);
 
     int user_wants_to_quit = false;
