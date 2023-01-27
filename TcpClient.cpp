@@ -1,3 +1,6 @@
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <cstring>
 #include <iostream>
 #include <string>
 #include <unistd.h>
@@ -8,249 +11,305 @@
 #include <thread>
 #include <vector>
 #include <fstream>
+#include <unordered_map>
+#include <deque>
+#include <mutex>
+#include <condition_variable>
 
-void send_to_server(int sock, const std::string &message)
+const std::string
+        CLOSE_SOCKET_PREFIX = "CLOSE_SOCKET:",
+        UPLOAD_PREFIX = "!upload:";
+
+std::vector<std::string> splitBy(const std::string &s, char delimiter)
 {
-  // also send the \0 so that empty strings can be transmitted!
-  int bytes_sent = send(sock, message.c_str(), message.size() + 1, 0);
-  if (bytes_sent <= 0)
-  {
-    std::cerr << "error occurred while writing to server" << std::endl;
-    exit(EXIT_FAILURE);
-  }
+    size_t pos_start = 0, pos_end;
+    std::string token;
+    std::vector<std::string> res;
 
-  // to disable msg batching (Nagle's Algorithm)
-  std::this_thread::sleep_for(std::chrono::milliseconds(75));
+    while ((pos_end = s.find(delimiter, pos_start)) != std::string::npos)
+    {
+        token = s.substr(pos_start, pos_end - pos_start);
+        pos_start = pos_end + 1;
+        res.push_back(token);
+    }
+
+    res.push_back(s.substr(pos_start));
+    return res;
+}
+
+template <typename T>
+class ThreadSafeQueue
+{
+private:
+    std::deque<T> q;
+    std::mutex m;
+    std::condition_variable cv;
+
+public:
+    void push(T item)
+    {
+        std::unique_lock<std::mutex> lock(m);
+        q.push_back(item);
+        lock.unlock();
+        cv.notify_one();
+    }
+
+    T pop()
+    {
+        std::unique_lock<std::mutex> lock(m);
+        cv.wait(lock, [this]()
+        { return !q.empty(); });
+        T item = q.front();
+        q.pop_front();
+        return item;
+    }
+};
+
+void sendToServer(int sock, const std::string &message)
+{
+    // also send the \0 so that empty strings can be transmitted!
+    int bytes_sent = send(sock, message.c_str(), message.size() + 1, 0);
+    if (bytes_sent <= 0)
+    {
+        std::cerr << "error occurred while writing to server" << std::endl;
+        exit(EXIT_FAILURE);
+    }
+
+    // to disable msg batching (Nagle's Algorithm)
+    // std::cout << "|| sent " << message << " || gonna sleep 100ms" << std::endl;
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+}
+
+struct ArgsForDownloadWorder
+{
+    ThreadSafeQueue<std::string> *q;
+    // q will contains messages like:
+    // name-of-file.txt: some line to append to the file
+    // name-of-file.txt: another line to append to the file
+    // different-file.txt: some line some text blah blah
+    // name-of-file.txt: !done (this is a special message meaning - close the file)
+
+    int *noDownloadsHappening;
+    // the downloader thread will change this variable to communicate with the main thread
+};
+
+// runs in a separate thread
+void downloadingWorker(struct ArgsForDownloadWorder args)
+{
+    int sock_to_close = 0;
+    // the main thread will send us its socket number when the user wants to quit.
+    // in that case, we will close the socket when there are no more downloads.
+
+    std::unordered_map<std::string, std::ofstream *> openFiles;
+
+    while (!sock_to_close || !openFiles.empty())
+    {
+        // block this thread until there's a message in it
+        std::string msg = args.q->pop();
+
+        if (msg.rfind(CLOSE_SOCKET_PREFIX, 0) == 0)
+        {
+            // the main threads signals we should start packing our stuff and leave.
+            // we'll close the socket and exit as soon as all downloads are finished.
+            sock_to_close = std::stoi(msg.substr(CLOSE_SOCKET_PREFIX.length()));
+            continue;
+        }
+
+        // a message to us will look like this:
+        // name-of-file.txt: some line to append to the file
+
+        auto parts = splitBy(msg, ':');
+        std::string filename = parts[0];
+        std::string lineToAppend = parts[1].substr(1); // start after the space
+
+        // if this file isn't already open
+        if (openFiles.find(filename) == openFiles.end())
+        {
+            std::ofstream *file = new std::ofstream;
+            file->open(filename);
+            if (file->fail())
+            {
+                std::cerr << "error: cannot write to: " << filename << std::endl;
+            }
+            openFiles.emplace(filename, file);
+        }
+
+        std::ofstream *filePtr = openFiles[filename];
+
+        if (lineToAppend == "!done")
+        {
+            if (filePtr->is_open())
+            {
+                filePtr->close();
+            }
+            delete openFiles[filename]; // the ofstream ptr has to be freed
+            openFiles.erase(filename);  // reduce the map's size by one
+        }
+
+        else if (filePtr->is_open())
+        {
+            // the file might not be open if we had no permissions to write it
+            *filePtr << lineToAppend << std::endl;
+        }
+
+        *args.noDownloadsHappening = openFiles.empty();
+    }
+
+    *args.noDownloadsHappening = true;
+    close(sock_to_close);
+    exit(EXIT_SUCCESS);
 }
 
 bool startsWith(const char *buffer, const std::string &prefix)
 {
-  return strncmp(buffer, prefix.c_str(), prefix.length()) == 0;
+    return strncmp(buffer, prefix.c_str(), prefix.length()) == 0;
 }
 
 void uploadFileToServer(const char *path, int sock)
 {
-  std::string line;
-  std::ifstream myfile;
-  myfile.open(path);
+    std::string line;
+    std::ifstream myfile;
+    myfile.open(path);
 
-  if (myfile.is_open())
-  {
-    while (getline(myfile, line))
+    if (myfile.is_open())
     {
-      send_to_server(sock, line);
+        while (getline(myfile, line))
+        {
+            sendToServer(sock, line);
+        }
     }
-  }
-  else
-  {
-    std::cout << "could not read file: " << path << std::endl;
-  }
-
-  static const std::string DONE = "!done";
-  send_to_server(sock, DONE);
-}
-
-struct DownloadThread_Args {
-  std::string path;
-  int sock;
-  std::ofstream* filePtr;
-
-  DownloadThread_Args(std::string path, int sock, std::ofstream* filePtr) 
-    : path(path), sock(sock), filePtr(filePtr) { }
-};
-
-void downloadFileFromServer(DownloadThread_Args args)
-{
-  const std::string this_thread_prefix = "$" + args.path + ": ";
-  char buffer[4096];
-
-  std::ofstream& file = *args.filePtr;
-
-  while (true)
-  {
-    int bytes_received = recv(args.sock, buffer, sizeof(buffer), MSG_PEEK);
-    if (bytes_received <= 0)
+    else
     {
-      std::cerr << "error while downloading: recv failed" << std::endl;
-      break;
+        std::cout << "could not read file: " << path << std::endl;
     }
 
-    // the message is promised to end with '\0' by the server!
-    const std::string raw_msg(buffer);
-
-    // if it doesn't start with our prefix, it's not for us
-    if (raw_msg.rfind(this_thread_prefix, 0) != 0) continue;
-
-    // pop the message from the queue
-    int raw_msg_len = recv(args.sock, buffer, sizeof(buffer), 0);
-    if (raw_msg_len <= 0)
-    {
-      std::cerr << "error while downloading: recv with no flags failed" << std::endl;
-      break;
-    }
-
-    const std::string msg = raw_msg.substr(this_thread_prefix.length());
-
-    if (msg == "!done") break;
-
-    if (args.filePtr->is_open()) *args.filePtr << msg << std::endl;
-  }
-
-  if (args.filePtr->is_open()) args.filePtr->close();
-
-  delete args.filePtr;
-}
-
-void handleSpecialCommands(int sock, const char *cmd, std::vector<std::thread*>& downloads)
-{
-  static const std::string UPLOAD_PREFIX = "!upload:";
-
-  if (startsWith(cmd, UPLOAD_PREFIX))
-  {
-    const char *path = cmd + UPLOAD_PREFIX.length();
-    uploadFileToServer(path, sock);
-  }
-
-  static const std::string DOWNLOAD_PREFIX = "!download:";
-
-  if (startsWith(cmd, DOWNLOAD_PREFIX))
-  {
-    std::string path = cmd + DOWNLOAD_PREFIX.length();
-
-    std::ofstream* filePtr = new std::ofstream(path);
-    if (!filePtr->is_open())
-    {
-      std::cerr << "error: cannot write to: `" << path << "`" << std::endl;
-      // no return,
-      // becuase the thread must pull its "$download messages from the socket queue
-    }
-
-    auto args = DownloadThread_Args(path, sock, filePtr);
-    downloads.push_back( new std::thread(downloadFileFromServer, args) );
-  }
+    static const std::string DONE = "!done";
+    sendToServer(sock, DONE);
 }
 
 int main(int argc, char *argv[])
 {
-  if (argc < 3)
-  {
-    std::cout << "usage: " << argv[0] << " hostname port" << std::endl;
-    exit(EXIT_FAILURE);
-  }
-
-  int sock = socket(AF_INET, SOCK_STREAM, 0);
-  if (sock < 0)
-  {
-    std::cout << "failed to create socket" << std::endl;
-    exit(EXIT_FAILURE);
-  }
-
-  hostent *server = gethostbyname(argv[1]);
-  if (server == nullptr)
-  {
-    std::cout << "failed to resolve hostname" << std::endl;
-    exit(EXIT_FAILURE);
-  }
-
-  sockaddr_in server_address;
-  server_address.sin_family = AF_INET;
-  server_address.sin_port = htons(std::stoi(argv[2]));
-  memcpy(&server_address.sin_addr.s_addr, server->h_addr, server->h_length);
-
-  if (connect(sock, (sockaddr *)&server_address, sizeof(server_address)) < 0)
-  {
-    std::cout << "failed to connect to server" << std::endl;
-    exit(EXIT_FAILURE);
-  }
-
-  fd_set readfds, writefds;
-  int max_fd = std::max(sock, STDIN_FILENO) + 1;
-
-  std::vector<std::thread*> downloads;
-  std::string input;
-
-  while (true)
-  {
-    FD_ZERO(&readfds);
-    FD_ZERO(&writefds);
-
-    // Add the socket and standard input to the read set
-    FD_SET(sock, &readfds);
-    FD_SET(STDIN_FILENO, &readfds);
-
-    // Add the socket to the write set if there is data to send
-    if (!input.empty())
+    if (argc < 3)
     {
-      FD_SET(sock, &writefds);
-    }
-
-    // Wait for data to be available on any of the file descriptors
-    int result = select(max_fd, &readfds, &writefds, nullptr, nullptr);
-    if (result < 0)
-    {
-      std::cout << "error occurred during select" << std::endl;
-      break;
-    }
-
-    if (FD_ISSET(STDIN_FILENO, &readfds))
-    {
-      std::getline(std::cin, input);
-
-      // normally it'd be set if there's something in std;
-      // we want to set it even if the user has typed an empty line,
-      // so that empty lines, too, will be sent to the server.
-      if (input.empty()) FD_SET(sock, &writefds);
-    
-      else if (input == "8") break;
-    }
-
-    if (FD_ISSET(sock, &writefds))
-    {
-      send_to_server(sock, input);
-      input.clear();
-    }
-
-    if (FD_ISSET(sock, &readfds))
-    {
-      char buffer[4096];
-      int bytes_received = recv(sock, buffer, sizeof(buffer), MSG_PEEK);
-      if (bytes_received <= 0)
-      {
-        // std::cout << "connection closed by server" << std::endl;
+        std::cout << "usage: " << argv[0] << " hostname port" << std::endl;
         exit(EXIT_FAILURE);
-      }
-
-      // the message is promised to end with '\0' by the server!
-
-      if (buffer[0] == '$') continue;
-
-      // pop the message from the queue
-      if (recv(sock, buffer, sizeof(buffer), 0) <= 0)
-      {
-        std::cout << "error reading from server: recv with no flags failed" << std::endl;
-        break;
-      }
-
-      if (buffer[0] == '!')
-      {
-        handleSpecialCommands(sock, buffer, downloads);
-      }
-      else
-      {
-        std::cout << buffer << std::endl;
-      }
     }
-  }
 
-  // if we want to quit, let's just finish the downloads first
-  // todo only print if some threads are still alive
-  std::cout << "waiting for downloads to finish..." << std::endl;
-  for (const auto downloadThread : downloads)
-  {
-    downloadThread->join();
-    delete downloadThread;
-  }
+    int sock = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock < 0)
+    {
+        std::cerr << "failed to create socket" << std::endl;
+        exit(EXIT_FAILURE);
+    }
 
-  close(sock);
-  return 0;
+    hostent *server = gethostbyname(argv[1]);
+    if (server == nullptr)
+    {
+        std::cerr << "failed to resolve hostname" << std::endl;
+        exit(EXIT_FAILURE);
+    }
+
+    try
+    {
+        std::stoi(argv[2]);
+    }
+    catch (std::invalid_argument&)
+    {
+        std::cerr << "invalid port number" << std::endl;
+    }
+
+    sockaddr_in server_address;
+    server_address.sin_family = AF_INET;
+    server_address.sin_port = htons(std::stoi(argv[2]));
+    memcpy(&server_address.sin_addr.s_addr, server->h_addr, server->h_length);
+
+    if (connect(sock, (sockaddr *)&server_address, sizeof(server_address)) < 0)
+    {
+        std::cerr << "failed to connect to server..." << std::endl;
+        std::cerr << "make sure that ip and port are correct, and that the server is up." << std::endl;
+        exit(EXIT_FAILURE);
+    }
+
+    ThreadSafeQueue<std::string> q;
+    int noDownloadsHappening = true;
+    struct ArgsForDownloadWorder args = {&q, &noDownloadsHappening};
+    std::thread download_thread(downloadingWorker, args);
+
+    int user_wants_to_quit = false;
+    // if this is true, stdin/stdout will stop echoing to/from the server,
+    // and we'll exit the process as soon as the downloads thread finishes.
+
+    while (true)
+    {
+        fd_set readfds;
+        FD_ZERO(&readfds);
+        FD_SET(sock, &readfds);
+        if (!user_wants_to_quit)
+        {
+            FD_SET(STDIN_FILENO, &readfds);
+        }
+
+        int max_fd = sock;
+        select(max_fd + 1, &readfds, NULL, NULL, NULL);
+
+        if (FD_ISSET(sock, &readfds))
+        {
+            char buffer[4096];
+            int n = recv(sock, buffer, sizeof(buffer), 0);
+            if (n == 0)
+            {
+                std::cerr << "connection closed by server" << std::endl;
+                close(sock);
+                exit(EXIT_FAILURE);
+            }
+            if (n < 0)
+            {
+                if (noDownloadsHappening)
+                {
+                    // we're probably here because the thread signaled us its done
+                    // by closing the socket, hence causing our recv to fail
+                    exit(EXIT_SUCCESS);
+                }
+                else
+                {
+                    std::cerr << "error reading from the server" << std::endl;
+                    close(sock);
+                    exit(EXIT_FAILURE);
+                }
+            }
+
+            if (startsWith(buffer, UPLOAD_PREFIX)) // this implies (buffer[0] == '!')
+            {
+                const char *path = buffer + UPLOAD_PREFIX.length();
+                uploadFileToServer(path, sock);
+            }
+            else if (buffer[0] == '$') // the msg is some line to append to some file
+            {
+                q.push(std::move(std::string(buffer + 1)));
+            }
+            else if (!user_wants_to_quit)
+            {
+                std::cout << buffer << std::endl;
+            }
+        }
+
+        if (FD_ISSET(STDIN_FILENO, &readfds))
+        {
+            std::string input;
+            std::getline(std::cin, input);
+            if (input == "8")
+            {
+                user_wants_to_quit = true;
+                q.push(CLOSE_SOCKET_PREFIX + std::to_string(sock));
+                if (!noDownloadsHappening)
+                {
+                    std::cout << "waiting for download(s) to finish..." << std::endl;
+                }
+            }
+            else
+            {
+                sendToServer(sock, input);
+            }
+        }
+    }
 }

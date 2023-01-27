@@ -12,11 +12,8 @@ void sendResultsToClient(DefaultIO *dio, std::vector<std::string> stringsToSend,
         // $file.txt: this is a line for the file
         dio->write(ss.str());
     }
-      
-    // std::this_thread::sleep_for(std::chrono::seconds(1));
 
-    dio->write("$" + path + ": " + "!done");
-    // $file: !done
+    dio->write("$" + path + ": " + "!done"); // $file: !done
 }
 
 void CmdDownloadResults::execute()
@@ -34,7 +31,7 @@ void CmdDownloadResults::execute()
 
     dio->write("What do you want to name the file?");
     std::string path = dio->read();
-    dio->write("!download:" + path);
+    // dio->write("!download:" + path);
 
     thread(sendResultsToClient, dio, knn->getPred(), path).detach();
 }
