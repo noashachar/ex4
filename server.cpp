@@ -129,7 +129,7 @@ int main(int argc, char* argv[]) {
         return 2;
     }
     // this loop for each client
-    while (true) {     
+    while (true) {
         int client_sock_fd = s.acceptClient();
         if (!client_sock_fd) {
             perror("could not accept client");
