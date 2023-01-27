@@ -247,7 +247,9 @@ int main(int argc, char *argv[])
                 q.push(CLOSE_SOCKET_PREFIX + std::to_string(sock));
                 if (!noDownloadsHappening)
                 {
-                    std::cout << "waiting for download(s) to finish..." << std::endl;
+                    // std::cout << "waiting for download(s) to finish..." << std::endl;
+                    // i was not sure if we were allowed to print extra things,
+                    // but it could have been nice to tell the user so
                 }
             }
             else
