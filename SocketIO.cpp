@@ -36,10 +36,6 @@ string SocketIO::read()
     }
 
     string reply(buffer);
-
-    // todo delete the next line
-    // std::cout << "debug: server read `" << reply << "` (len: " << reply.length() << ")" << std::endl; 
-
     return reply;
 }
 
@@ -56,7 +52,7 @@ void SocketIO::write(string msg)
     }
 
     // to disable msg batching (Nagle's Algorithm)
-    std::this_thread::sleep_for(std::chrono::milliseconds(75));
+    std::this_thread::sleep_for(std::chrono::milliseconds(150));
 
     sendGuard.unlock();
 }
