@@ -3,11 +3,8 @@
 //
 
 #include "utils.h"
-#include <iostream>
+
 #include <vector>
-#include <fstream>
-#include <sstream>
-#include "distances.h"
 
 
 using namespace std;
@@ -32,41 +29,6 @@ DistanceCalculator* createDistCalc(string& name) {
 }
 
 
-//read classified file return two vectors one is a vector of vectors of the vales and one for the tags
-pair<vector<vector<double>>, vector<string>> readFileToVectors(string& path)
-{
-    fstream file(path, ios::in);
-    vector<vector<double>> content;
-    vector<double> row;
-    vector<string> tag;
-    string line, word;
-
-    if (file.is_open())
-    {
-        while (getline(file, line))
-        {
-            row.clear();
-            stringstream str(line);
-            while (getline(str, word, ','))
-            {
-                try
-                {
-                    row.push_back(stof(word));
-                }
-                catch (std::exception& e)
-                {
-                    tag.push_back(word);
-                }
-            }
-            content.push_back(row);
-        }
-        file.close();
-    }
-    else {
-        cout << "Could not open the file" << endl;
-    }
-    return make_pair(content, tag);
-}
 
 bool is_legal(vector<vector<double>>& f, vector<string>& s) {
     if (f.size() != s.size()) {
@@ -96,24 +58,20 @@ bool is_legalPred(vector<vector<double>> f) {
     return true;
 }
 
-//split sperates the string text put it in a vector
-//get text and some seperator- one space in our case
-vector<double> split(const string& text, char sep) {
-    try {
-        vector<double> tokens;
-        size_t start = 0, end;
-        while ((end = text.find(sep, start)) != string::npos) {
-            double var = stod(text.substr(start, end - start));
-            tokens.push_back(var);
-            start = end + 1;
-        }
-        double var = stod(text.substr(start));
-        tokens.push_back(var);
-        return tokens;
+
+vector<string> splitBy(const string &s, char delimiter)
+{
+    size_t pos_start = 0, pos_end;
+    string token;
+    vector<string> res;
+
+    while ((pos_end = s.find(delimiter, pos_start)) != string::npos)
+    {
+        token = s.substr(pos_start, pos_end - pos_start);
+        pos_start = pos_end + 1;
+        res.push_back(token);
     }
 
-    catch (std::exception& e) {
-        vector<double> tokens;
-        return tokens;
-    }
+    res.push_back(s.substr(pos_start));
+    return res;
 }

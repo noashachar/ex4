@@ -16,17 +16,12 @@
 
 class CLI {
 private:
-    Command* commands[NUM_COMMANDS];
+    Command* commands[NUM_COMMANDS]{};
     DefaultIO* dio;
     Knn* knn;
 
-    // todo add members here:
-    //  metric, k
-    //  vectors train_X, train_y (which the client sent in csv)
-    //  vectors uploaded_X (which the client sent in csv)
-
 public:
-    CLI(DefaultIO* dio);
+    explicit CLI(DefaultIO* dio);
 
     ~CLI();
 

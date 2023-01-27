@@ -17,7 +17,7 @@ void CmdDisplayResults::execute()
         return;
     }
 
-    ostringstream s_stream;
+    std::ostringstream s_stream;
 
     for (int i = 1; i <= knn->getPred().size(); i++)
     {

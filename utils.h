@@ -12,9 +12,7 @@
 DistanceCalculator* createDistCalc(std::string &name) ;
 bool is_legal(std::vector<std::vector<double>>& f, std::vector<std::string>& s);
 bool is_legalPred(std::vector<std::vector<double>> f);
-std::vector<double> split(const std::string &text, char sep);
-std::pair<std::vector<std::vector<double>>, std::vector<std::string>> readFileToVectors(std::string &path);
-
-
+//is this necessary?
+std::vector<std::string> splitBy(const std::string &s, char delimiter);
 
 #endif //EX2_UTILS_H

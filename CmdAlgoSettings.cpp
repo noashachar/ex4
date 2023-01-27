@@ -3,7 +3,7 @@
 //
 #include "utils.h"
 #include "CmdAlgoSettings.h"
-
+using namespace std;
 void CmdAlgoSettings::execute()
 {
     ostringstream s_stream;

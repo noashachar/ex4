@@ -62,16 +62,6 @@ void CLI::start()
             continue;
         }
 
-        // if (user_number == 636)
-        // {
-        //     stringstream ss;
-        //     ss << "the size of my X is " << knn->getknnX().size() << "\n";
-        //     ss << "the size of my y is " << knn->getknnY().size() << "\n";
-        //     ss << "the size of my  is test is " << knn->getunknnX().size();
-        //     ;
-        //     dio->write(ss.str());
-        //     continue;
-        // }
 
         if (user_number <= 0 || user_number > NUM_COMMANDS)
         {

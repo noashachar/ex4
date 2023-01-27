@@ -57,7 +57,7 @@ void SocketIO::write(string msg)
     sendGuard.unlock();
 }
 
-const char *SocketIoConnectionEnded::what() const throw()
+const char *SocketIoConnectionEnded::what() const noexcept
 {
     const static char *msg = (char *)"client disconnected";
     return msg;

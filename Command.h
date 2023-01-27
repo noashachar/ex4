@@ -26,7 +26,7 @@ public:
     // this doesn't delete dio, because many commands share the same dio;
     // also the commands' parent share the same dio. hence the parent will delete it.
     //same in knn
-    virtual ~Command() {}
+    virtual ~Command() = default;
 };
 
 
