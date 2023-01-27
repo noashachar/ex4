@@ -1,39 +1,86 @@
+# Assignment 4: KNN classifications from CSV files
 
-# KNN Algorithm with Different Distance Metrics, in Client-Server Architecture
+This project is a C++ implementation of a server-client program using TCP sockets and threads.
 
-This project contains an implementation of the k-nearest neighbors (KNN) algorithm using different distance metrics. The project contains an abstract base class called `DistanceCalculator` with a virtual function called `calculateDistance`. Five different classes inherit from this base class and implement the `calculateDistance` function using different distance metrics, such as Manhattan distance and Euclidean distance.
 
-The `Knn` class has a field of type pointer to an object of one of the classes that inherit from `DistanceCalculator`. This allows the `Knn` class to use the selected distance metric to compute distances between data points.
+Server
+---
+The server is designed to support multiple clients by using threads. It supports the following functionalities:
+- Uploading CSV files for the KNN classifier to train on.
+- Uploading CSV files for the KNN classifier to predict labeles for.
+- Changing the KNN params (k, metric).
+- Display the results.
+- Download the results in the background (mutliple simultaneous downloads supported).
 
-The User-Interface is a little program called "client" which awaits one-line inputs in the cmd, and passes them to the backend server (which calculates the result using KNN algorithm);
-The server them replies to the client with the result, and the client simply outputs it, and goes back to listening for one-line inputs from the user.
+Client
+---
+The client has two threads:
 
-All communication between the client and the server is textual and is done simple TCP.
+The main thread reads from both stdin and the socket.
 
-## Usage
+Every message from stdin in simply sent to the server; however messages from the server are trickier:
 
-To run the project, compile with `make`.
+- If a message starts with a dollar symbol, then it is for a download (the message will contain some filename and some line to append to it); the main thread will simply push that message to a thread-safe queue.
 
-You'll then need to run the server followed by the client:
+- If a message starts with a bang symbol, then it's a call for some file to be uploaded.
 
-`./server.out <path/to/classified-examples.csv> <port>`   
-`./client.out <ip> <port>`  
-Then, in the client, write as many lines as you'd like in the following format:
-`...<vector-entries> <knn-metric> <knn-k-value>`
-for example:
-`1.2 3.4 5.6 7.8 MAN 7`
+- If a message doesn't start with a special symbol, it'll simply be printed to the user.
 
-The following values for `knn-metric` are supported:
+The client's second thread is responsible for popping messages from the queue, and handling them by appending lines into the appropriate files.
+
+Mutliple concurrent downloads are supported.
+
+How to Run
+---
+
+To run the server and client, follow these steps:
+
+```
+make
+./server.out <port>
+./client.out <ip> <port>
+```
+
+You'll be greeted be a menu:
+```
+Welcome to the KNN Classifier Server. Please choose an option:
+1. upload an unclassified csv data file
+2. algorithm settings
+3. classify data
+4. display results
+5. download results
+8. exit
+```
+
+Type a number and hit *\<Enter\>*.
+
+---
+
+If you hit `8` to exit, and there are still downloads in the background, you'll see
+
+`
+waiting for download(s) to finish...
+`
+
+And the client will close itself a couple of seconds later when all downloads are finished.
+
+
+---
+
+All the menu optoins are pretty self explainatory, except for command 2 🙃
+
+To change the algorithm settings, type `2`, then `k metric`, where k is a number, and k is name of a metric;
+
+The following values for `metrics` are supported:
 -   `MAN` for Manhattan distance
 -   `AUC` for Euclidean distance
 -   `CHB` for Chebyshev distance
 -   `MIN` for Minkowski distance
 -   `CAN` for Canberra distance
 
+
 ## Limitations
 
 The input data must be in CSV format, with the class label as the last column of each row.
 
-Right now the server only supports one client at a time.
-
-The server and the client only run on UNIX based systems.
+The server and the client only run on UNIX based systems, due to use of pthread.
